@@ -18,7 +18,7 @@ import datetime
 # ========== CONFIG:在这里改你的标的和阈值 ==========
 ASSETS = {
     "VOO":   0.04,
-    "QQQ":   0.0003,
+    "QQQ":   0.06,
     "NVDA":  0.06,
     "SNDK":  0.06,
     "AIPO":  0.06,
@@ -115,7 +115,8 @@ def notify(messages):
             req = urllib.request.Request(
                 url, data=data,
                 headers={
-                    "Title": "Dip 买入信号",
+                    # HTTP 头只能 latin-1, 所以 Title 用英文; 中文内容在 body(UTF-8)里
+                    "Title": "Dip Buy Signal",
                     "Priority": "high",
                     "Tags": "chart_with_downwards_trend",
                 },
