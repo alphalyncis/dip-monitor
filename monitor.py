@@ -22,33 +22,53 @@ ASSETS = {
     "NVDA":  0.06,
     "SNDK":  0.06,
     "AIPO":  0.06,
-    "MRAAY": 0.08,
+    "MRAAY": 0.06,
 }
 STATE_FILE = "state.json"
 # ==================================================
 
-STOOQ_URL = "https://stooq.com/q/l/?s={sym}.us&f=sd2t2ohlcv&h&e=csv"
+STOOQ_URL = "https://stooq.com/q/d/l/?s={sym}.us&i=d"
+YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1d&range=5d"
+
+
+def fetch_from_stooq(symbol):
+    url = STOOQ_URL.format(sym=symbol.lower())
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        text = r.read().decode("utf-8").strip()
+    lines = text.splitlines()
+    if len(lines) < 2:
+        return None
+    close = lines[-1].split(",")[4]
+    if close in ("N/D", "", None):
+        return None
+    return float(close)
+
+
+def fetch_from_yahoo(symbol):
+    url = YAHOO_URL.format(sym=symbol)
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        data = json.loads(r.read().decode("utf-8"))
+    result = data["chart"]["result"][0]
+    closes = result["indicators"]["quote"][0]["close"]
+    # 取最后一个非空收盘价
+    for c in reversed(closes):
+        if c is not None:
+            return float(c)
+    return None
 
 
 def fetch_price(symbol):
-    """从 stooq 拉最新收盘价(免费、无需 API key)。返回 float 或 None。"""
-    url = STOOQ_URL.format(sym=symbol.lower())
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=20) as r:
-            text = r.read().decode("utf-8").strip()
-        # CSV: Symbol,Date,Time,Open,High,Low,Close,Volume
-        lines = text.splitlines()
-        if len(lines) < 2:
-            return None
-        cols = lines[1].split(",")
-        close = cols[6]
-        if close in ("N/D", "", None):
-            return None
-        return float(close)
-    except Exception as e:
-        print(f"  [WARN] fetch {symbol} failed: {e}")
-        return None
+    """先试 stooq,失败再试 Yahoo。返回 float 或 None。"""
+    for name, fn in [("stooq", fetch_from_stooq), ("yahoo", fetch_from_yahoo)]:
+        try:
+            p = fn(symbol)
+            if p is not None:
+                return p
+        except Exception as e:
+            print(f"  [WARN] {name} {symbol} failed: {e}")
+    return None
 
 
 def load_state():
