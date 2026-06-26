@@ -18,7 +18,7 @@ import datetime
 # ========== CONFIG:在这里改你的标的和阈值 ==========
 ASSETS = {
     "VOO":   0.04,
-    "QQQ":   0.06,
+    "QQQ":   0.0003,
     "NVDA":  0.06,
     "SNDK":  0.06,
     "AIPO":  0.06,
