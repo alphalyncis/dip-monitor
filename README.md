@@ -1,3 +1,8 @@
+[English](#english) | [中文](#中文)
+
+---
+
+<a name="中文"></a>
 # Dip Monitor
 
 一个轻量、免费的股票**逢跌买入提醒**工具。跑在 GitHub Actions 上,当某只标的从近期高点回撤设定的百分比时,推送通知到你手机。
@@ -12,13 +17,15 @@
 2. 当价格跌到 `ref × (1 − 阈值)` 时,触发一个**逢跌信号**。
 3. 触发后 `ref` 重置到当前价——因此持续下跌会在每跌一档时继续触发("连跌连买")。
 
+**首次运行的初始化:** 脚本第一次见到某只标的时,会拉取「策略起点(`STRATEGY_START`,默认 `2025-07-25`)→ 今天」的完整历史,**从起点开始完整回放上面的 ref 逻辑**,得到与你的回测一致的当前 `ref`。之后每次运行只看最新价,在此 `ref` 基础上增量更新。
+
 状态(滚动参考点 `ref` 和每月触发次数)保存在 `state.json` 中,每次运行后提交回仓库,因此工具能跨次运行"记住"。
 
 ```
 GitHub Actions(定时)
       |
       v
-   monitor.py  --->  拉取最新价格(stooq)
+   monitor.py  --->  拉取价格(Yahoo Finance)
       |                 |
       |                 v
       |           更新 ref / 检测回撤
@@ -31,6 +38,7 @@ GitHub Actions(定时)
 
 - **免费**——完全运行在 GitHub Actions 免费额度内
 - **跟随高点逻辑**——按"从滚动高点回撤百分比"提醒,而非固定价格
+- **策略回放初始化**——首次用历史数据还原 ref,与回测一致
 - **连跌连买**——持续下跌时每跌一档继续触发
 - **月度触发计数**——记录每只标的本月触发了几次
 - **手机推送([ntfy](https://ntfy.sh))**——无需注册、无需 token
@@ -39,15 +47,15 @@ GitHub Actions(定时)
 ## 安装步骤(约 10 分钟)
 
 ### 1. 使用本仓库
-把以下文件 Fork 或复制到一个仓库中:
+把以下文件复制到一个仓库中:
 ```
 monitor.py
 .github/workflows/monitor.yml
 README.md
 ```
 
-### 2. 配置你的标的
-编辑 `monitor.py` 顶部的 `ASSETS`:
+### 2. 配置你的标的与起点
+编辑 `monitor.py` 顶部:
 ```python
 ASSETS = {
     "VOO":  0.04,   # 标的 : 回撤阈值(4%)
@@ -55,6 +63,7 @@ ASSETS = {
     "NVDA": 0.06,
     # 添加你自己的 ...
 }
+STRATEGY_START = "2025-07-25"   # ref 回放的起点, 与你的回测保持一致
 ```
 
 ### 3.(可选)用 ntfy 推送到手机
@@ -67,6 +76,8 @@ ASSETS = {
 3. 在仓库:**Settings -> Secrets and variables -> Actions -> New repository secret**
    - 名称(Name):`NTFY_TOPIC`
    - 值(Value):你的频道名
+
+推送标题为英文(`Dip Buy Signal`),正文可含中文。
 
 ### 4. 启用 Actions
 - 进入 **Actions** 标签页,如有提示则启用工作流。
@@ -85,9 +96,9 @@ schedule:
 
 ## 说明与限制
 
-- **数据源([stooq](https://stooq.com))为收盘/延迟价**,非实时逐笔数据。适合波段/中长线建仓,不适合日内交易。
+- **数据源(Yahoo Finance)为日线收盘/延迟价**,非实时逐笔数据。适合波段/中长线建仓,不适合日内交易。
 - **月度触发计数只记录、不强制**——如需"月度上限",请在据信号操作时自行执行。
-- **OTC / 流动性差的标的**数据可能不全或延迟。
+- **OTC / 流动性差的标的**(如某些 ADR)数据可能不全或延迟。
 - GitHub Actions 免费额度对每个交易日运行几次绰绰有余。
 
 ## 免责声明
@@ -98,7 +109,9 @@ schedule:
 
 MIT
 
+---
 
+<a name="english"></a>
 # Dip Monitor
 
 A lightweight, free stock **dip-buying alert** tool that runs on GitHub Actions and pushes a notification to your phone when a ticker drops a set percentage from its recent high.
@@ -113,13 +126,15 @@ For each ticker you configure with a threshold:
 2. When the price falls to `ref × (1 − threshold)`, a **dip signal** fires.
 3. After firing, `ref` resets to the current price — so a sustained decline keeps firing at each further step down ("buy on each dip").
 
+**First-run initialization:** the first time the script sees a ticker, it pulls the full history from `STRATEGY_START` (default `2025-07-25`) to today and **replays the ref logic above from that start**, producing a current `ref` consistent with your backtest. Subsequent runs only fetch the latest price and update incrementally from that `ref`.
+
 State (the rolling `ref` and a per-month trigger count) is stored in `state.json` and committed back each run, so the tool "remembers" across runs.
 
 ```
 GitHub Actions (cron)
       |
       v
-   monitor.py  --->  fetch latest prices (stooq)
+   monitor.py  --->  fetch prices (Yahoo Finance)
       |                 |
       |                 v
       |           update ref / detect dip
@@ -132,6 +147,7 @@ GitHub Actions (cron)
 
 - **Free** — runs entirely on GitHub Actions' free tier
 - **Trailing-high logic** — alerts on % drop from the rolling high, not a fixed price
+- **Strategy-replay init** — first run reconstructs `ref` from history, matching your backtest
 - **Buy-on-each-dip** — keeps firing through a sustained decline
 - **Monthly trigger count** — tracks how many times each ticker fired this month
 - **Phone push via [ntfy](https://ntfy.sh)** — no account, no token
@@ -140,15 +156,15 @@ GitHub Actions (cron)
 ## Setup (~10 minutes)
 
 ### 1. Use this repo
-Fork or copy these files into a repository:
+Copy these files into a repository:
 ```
 monitor.py
 .github/workflows/monitor.yml
 README.md
 ```
 
-### 2. Configure your tickers
-Edit the `ASSETS` block at the top of `monitor.py`:
+### 2. Configure tickers and start date
+Edit the top of `monitor.py`:
 ```python
 ASSETS = {
     "VOO":  0.04,   # ticker : dip threshold (4%)
@@ -156,6 +172,7 @@ ASSETS = {
     "NVDA": 0.06,
     # add your own ...
 }
+STRATEGY_START = "2025-07-25"   # start date for ref replay; match your backtest
 ```
 
 ### 3. (Optional) Phone push with ntfy
@@ -168,6 +185,8 @@ To get phone pushes:
 3. In your repo: **Settings -> Secrets and variables -> Actions -> New repository secret**
    - Name: `NTFY_TOPIC`
    - Value: your topic name
+
+The push title is English (`Dip Buy Signal`); the body may contain other languages.
 
 ### 4. Enable Actions
 - Go to the **Actions** tab and enable workflows if prompted.
@@ -186,9 +205,9 @@ schedule:
 
 ## Notes & limitations
 
-- **Data source ([stooq](https://stooq.com)) is end-of-day / delayed**, not real-time tick data. Fine for swing/position entries; not for intraday trading.
+- **Data source (Yahoo Finance) is daily close / delayed**, not real-time tick data. Fine for swing/position entries; not for intraday trading.
 - The **monthly trigger count** is recorded, not enforced — if you want a monthly cap, apply it yourself when acting on alerts.
-- **OTC / thinly traded tickers** may have incomplete or delayed data.
+- **OTC / thinly traded tickers** (e.g. some ADRs) may have incomplete or delayed data.
 - GitHub Actions' free tier is more than enough for a few runs per weekday.
 
 ## Disclaimer
