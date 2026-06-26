@@ -27,48 +27,61 @@ ASSETS = {
 STATE_FILE = "state.json"
 # ==================================================
 
-STOOQ_URL = "https://stooq.com/q/d/l/?s={sym}.us&i=d"
-YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1d&range=5d"
+YAHOO_QUOTE = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1d&range=5d"
+YAHOO_HIST = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?period1={p1}&period2={p2}&interval=1d"
 
-
-def fetch_from_stooq(symbol):
-    url = STOOQ_URL.format(sym=symbol.lower())
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        text = r.read().decode("utf-8").strip()
-    lines = text.splitlines()
-    if len(lines) < 2:
-        return None
-    close = lines[-1].split(",")[4]
-    if close in ("N/D", "", None):
-        return None
-    return float(close)
-
-
-def fetch_from_yahoo(symbol):
-    url = YAHOO_URL.format(sym=symbol)
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        data = json.loads(r.read().decode("utf-8"))
-    result = data["chart"]["result"][0]
-    closes = result["indicators"]["quote"][0]["close"]
-    # 取最后一个非空收盘价
-    for c in reversed(closes):
-        if c is not None:
-            return float(c)
-    return None
+# 策略起点(和你回测一致)。脚本第一次见到某只标的时,
+# 会拉"起点 -> 今天"的历史,完整跑一遍你的 ref 爬高逻辑来初始化 ref。
+STRATEGY_START = "2025-07-25"
 
 
 def fetch_price(symbol):
-    """先试 stooq,失败再试 Yahoo。返回 float 或 None。"""
-    for name, fn in [("stooq", fetch_from_stooq), ("yahoo", fetch_from_yahoo)]:
-        try:
-            p = fn(symbol)
-            if p is not None:
-                return p
-        except Exception as e:
-            print(f"  [WARN] {name} {symbol} failed: {e}")
-    return None
+    """拉最新收盘价。返回 float 或 None。"""
+    url = YAHOO_QUOTE.format(sym=symbol)
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        closes = data["chart"]["result"][0]["indicators"]["quote"][0]["close"]
+        for c in reversed(closes):
+            if c is not None:
+                return float(c)
+        return None
+    except Exception as e:
+        print(f"  [WARN] price {symbol} failed: {e}")
+        return None
+
+
+def compute_ref(symbol, th):
+    """
+    复现你 Python 回测的逻辑来初始化 ref:
+    拉 STRATEGY_START -> 今天 的每日收盘价, 从第一天开始让 ref 跟随价格爬高,
+    跌破 ref*(1-th) 则触发并把 ref 重置到买入价(连跌连买)。
+    返回跑完整段历史后的当前 ref。
+    """
+    p1 = int(datetime.datetime.strptime(STRATEGY_START, "%Y-%m-%d")
+             .replace(tzinfo=datetime.timezone.utc).timestamp())
+    p2 = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+    url = YAHOO_HIST.format(sym=symbol, p1=p1, p2=p2)
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        closes = data["chart"]["result"][0]["indicators"]["quote"][0]["close"]
+        px = [c for c in closes if c is not None]
+        if not px:
+            return None
+        # ===== 你 Python 原逻辑 =====
+        ref = px[0]
+        for p in px:
+            if p > ref:
+                ref = p
+            if p <= ref * (1 - th):
+                ref = p
+        return float(ref)
+    except Exception as e:
+        print(f"  [WARN] hist {symbol} failed: {e}")
+        return None
 
 
 def load_state():
@@ -126,7 +139,15 @@ def main():
             continue
 
         st = state.get(sym, {})
-        ref = st.get("ref", price)        # 没有历史就用当前价初始化
+        if "ref" in st:
+            ref = st["ref"]                       # 已有历史,沿用记忆的 ref
+            first_init = False
+        else:
+            # 第一次见到这只:用 STRATEGY_START -> 今天 的历史跑你的逻辑,得到当前 ref
+            r = compute_ref(sym, th)
+            ref = r if r is not None else price
+            first_init = True
+            print(f"  [INIT] {sym} ref from strategy replay: {ref:.2f}")
         month = st.get("month", today[:7])
         count = st.get("count", 0)
 
@@ -142,13 +163,17 @@ def main():
         next_buy = ref * (1 - th)
         fired = price <= next_buy
 
-        if fired:
+        if fired and not first_init:
             count += 1
             msg = (f"{sym}: 价格 {price:.2f} 跌破 next_buy {next_buy:.2f} "
                    f"(阈值{int(th*100)}%) → 买入信号 #{count}(本月第{count}次)")
             triggered.append(msg)
             print("  >>> " + msg)
             ref = price  # 触发后重置(连跌连买)
+        elif fired and first_init:
+            # 初始化当天恰好已在触发位:更新 ref,但不补报历史信号
+            ref = price
+            print(f"  [INIT] {sym} 当前已处于触发位,ref 重置为 {price:.2f}(首次运行不补报)")
         else:
             drop_needed = (next_buy / price - 1) * 100
             print(f"{sym}: {price:.2f} | next_buy {next_buy:.2f} "
