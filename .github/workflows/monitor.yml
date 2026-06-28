@@ -5,7 +5,8 @@ on:
     # UTC 时间。美股盘中大致 14:30–21:00 UTC。
     # 这里设为周一到周五,每天 UTC 20:30(美东收盘前后)跑一次。
     # 想更频繁可加多行 cron,比如盘中每小时。
-    - cron: "30 20 * * 1-5"
+    - cron: "0 15 * * 0-6"
+    - cron: "30 20 * * 0-6"
   workflow_dispatch:        # 允许在 Actions 页面手动点运行
 
 permissions:
