@@ -1,44 +1,44 @@
 {
   "VOO": {
     "ref": 693.8599853515625,
-    "month": "2026-07",
+    "month": "2026-08",
     "count": 0,
     "last_price": 686.6500244140625,
-    "last_check": "2026-07-31"
+    "last_check": "2026-08-01"
   },
   "QQQ": {
     "ref": 687.989990234375,
-    "month": "2026-07",
-    "count": 2,
+    "month": "2026-08",
+    "count": 0,
     "last_price": 687.989990234375,
-    "last_check": "2026-07-31"
+    "last_check": "2026-08-01"
   },
   "NVDA": {
     "ref": 200.75,
-    "month": "2026-07",
-    "count": 1,
+    "month": "2026-08",
+    "count": 0,
     "last_price": 200.75,
-    "last_check": "2026-07-31"
+    "last_check": "2026-08-01"
   },
   "SNDK": {
     "ref": 1279.9599609375,
-    "month": "2026-07",
-    "count": 11,
+    "month": "2026-08",
+    "count": 0,
     "last_price": 1214.8299560546875,
-    "last_check": "2026-07-31"
+    "last_check": "2026-08-01"
   },
   "AIPO": {
     "ref": 28.684999465942383,
-    "month": "2026-07",
-    "count": 4,
+    "month": "2026-08",
+    "count": 0,
     "last_price": 28.6299991607666,
-    "last_check": "2026-07-31"
+    "last_check": "2026-08-01"
   },
   "MRAAY": {
-    "ref": 22.90999984741211,
-    "month": "2026-07",
-    "count": 6,
-    "last_price": 22.670000076293945,
-    "last_check": "2026-07-31"
+    "ref": 23.25,
+    "month": "2026-08",
+    "count": 0,
+    "last_price": 23.25,
+    "last_check": "2026-08-01"
   }
 }
